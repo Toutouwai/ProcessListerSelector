@@ -1,0 +1,272 @@
+<?php namespace ProcessWire;
+
+class ProcessListerSelector extends Process implements ConfigurableModule {
+
+	public static function getModuleinfo() {
+		return array(
+			'title' => 'Lister Selector',
+			'summary' => 'Use a selector string to list items with Lister/ListerPro.',
+			'version' => '0.1.0',
+			'author' => 'Robin Sallis',
+			'href' => 'https://github.com/Toutouwai/ListerSelector',
+			'icon' => 'search-plus',
+			'useNavJSON' => true,
+			'requires' => 'ProcessWire>=3.0.0, PHP>=5.4.0',
+			'page' => array(
+				'parent' => 'setup',
+				'name' => 'lister-selector',
+				'title' => 'Lister Selector',
+			),
+		);
+	}
+
+	/**
+	 * Init
+	 */
+	public function init() {
+		parent::init();
+		$this->addHookBefore('InputfieldForm::render', $this, 'beforeFormRender');
+		$this->addHookAfter('ProcessPageLister::renderedExtras', $this, 'afterRenderedExtras');
+		$this->addHookAfter('ProcessPageLister::getSelector', $this, 'afterGetSelector');
+	}
+
+	/**
+	 * Init
+	 */
+	public function __construct() {
+		parent::__construct();
+		$this->edit_mode = ProcessPageLister::windowModeNone;
+		$this->view_mode = ProcessPageLister::windowModeNone;
+	}
+
+	/**
+	 * Before InputfieldForm::render
+	 * Prevent filters form from being a WireTab
+	 *
+	 * @param HookEvent $event
+	 */
+	protected function beforeFormRender(HookEvent $event) {
+		/* @var InputfieldForm $form */
+		$form = $event->object;
+		if($form->id !== 'ProcessListerFiltersForm') return;
+		$form->removeClass('WireTab'); // Prevent form from being a WireTab
+	}
+
+	/**
+	 * After ProcessPageLister::renderedExtras
+	 * Add "Selector" tab
+	 *
+	 * @param HookEvent $event
+	 */
+	protected function afterRenderedExtras(HookEvent $event) {
+		/* @var ProcessPageLister $lister */
+		$lister = $event->object;
+		$wrapper = new InputfieldWrapper();
+		$session_selector = $lister->sessionGet('selector');
+		/* @var InputfieldText $f */
+		$f = $this->wire('modules')->get('InputfieldText');
+		$f->name = 'ls_selector';
+		$f->id = 'ls_selector';
+		$f->label = $this->_('Selector string');
+		if($session_selector) $f->value = $session_selector;
+		$wrapper->add($f);
+		$wrapper_render = $wrapper->render();
+		$out = "<div id='ListerSelectorTab' title='Selector' class='WireTab'>$wrapper_render</div>";
+		$event->return = $out . $event->return;
+	}
+
+	/**
+	 * After ProcessPageLister::getSelector
+	 * Replace processed selector with original saved to session
+	 *
+	 * @param HookEvent $event
+	 */
+	protected function afterGetSelector(HookEvent $event) {
+		/* @var ProcessPageLister $lister */
+		$lister = $event->object;
+		$event->return = $lister->sessionGet('selector');
+	}
+
+	/**
+	 * Execute
+	 *
+	 * @return string
+	 */
+	public function ___execute() {
+		$out = '';
+
+		// Add config icon
+		if(!$this->wire('config')->ajax) {
+			$config_tooltip = $this->_('Configure Lister Selector');
+			$admin_url = $this->wire('config')->urls->admin;
+			$out = "<a id='ListerSelectorConfig' href='{$admin_url}module/edit?name=ProcessListerSelector' target='_blank' uk-tooltip='title:$config_tooltip; pos:top-left' title='$config_tooltip'><i class='fa fa-fw fa-cog ui-priority-secondary'></i></a>";
+		}
+
+		// Render Lister
+		/* @var ProcessPageLister|ProcessPageListerPro $lister */
+		$lister = $this->getLister();
+		$bookmark = $this->wire('input')->get->text('bm');
+		if($bookmark) $lister->sessionSet('selector', $this->urlSafeBase64Decode($bookmark));
+		$out .= $lister->execute();
+
+		// Add late JS
+		$config = $this->wire('config');
+		$info = $this->getModuleInfo();
+		$version = $info['version'];
+		$config->scripts->add($config->urls->{$this} . "{$this}Late.js?v={$version}");
+
+		return $out;
+	}
+
+	/**
+	 * Get Lister/ListerPro instance
+	 *
+	 * @return ProcessPageLister|ProcessPageListerPro
+	 */
+	public function ___getLister() {
+		$modules = $this->wire('modules');
+		if($modules->isInstalled('ProcessPageListerPro')) {
+			/* @var ProcessPageListerPro $lister */
+			$lister = $this->modules->get('ProcessPageListerPro');
+			$lister->allowActions = $this->enabled_actions ?: [];
+			$lister->viewMode = $this->view_mode;
+			$lister->editMode = $this->edit_mode;
+		} else {
+			/* @var ProcessPageLister $lister */
+			$lister = $this->modules->get('ProcessPageLister');
+		}
+		$lister->allowBookmarks = false;
+		$lister->defaultSelector = '';
+		return $lister;
+	}
+
+	/**
+	 * Encodes the given data with base64, and returns a URL-safe string
+	 *
+	 * @param string $data
+	 * @return string
+	 */
+	public function urlSafeBase64Encode($data) {
+		return strtr(base64_encode($data), ['+' => '-', '/' => '_', '=' => '']);
+	}
+
+	/**
+	 * Decodes URL-safe base64 encoded data
+	 *
+	 * @param string $data
+	 * @param bool $strict
+	 * @return string
+	 */
+	function urlSafeBase64Decode($data, $strict = false) {
+		return base64_decode(strtr($data, '-_', '+/'), $strict);
+	}
+
+	/**
+	 * Output JSON list of navigation items (bookmarks)
+	 *
+	 * @param array $options
+	 * @return array|string
+	 *
+	 */
+	public function ___executeNavJSON(array $options = array()) {
+		$options['add'] = null;
+		if(!$this->bookmarks) return parent::___executeNavJSON($options);
+		$options['items'] = [];
+		$i = 0;
+		$bookmarks = explode("\n", str_replace("\r", "", $this->bookmarks));
+		foreach($bookmarks as $line) {
+			$pieces = explode(':', $line, 2);
+			if(count($pieces) !== 2) continue;
+			$options['items'][$i]['id'] = $this->urlSafeBase64Encode($pieces[1]);
+			$options['items'][$i]['label'] = $pieces[0];
+			$i++;
+		}
+		$options['icon'] = 'search';
+		$options['itemLabel'] = 'label';
+		$options['edit'] = '?bm={id}';
+		$options['sort'] = false;
+		return parent::___executeNavJSON($options);
+	}
+
+	/**
+	 * Config inputfields
+	 *
+	 * @param InputfieldWrapper $inputfields
+	 */
+	public function getModuleConfigInputfields($inputfields) {
+		$modules = $this->wire('modules');
+
+		/* @var InputfieldTextarea $f */
+		$f = $modules->get('InputfieldTextarea');
+		$f_name = 'bookmarks';
+		$f->name = $f_name;
+		$f->label = $this->_('Bookmarks');
+		$f->description = $this->_('Enter bookmarks in the format label:selector, one per line.');
+		$f->icon = 'bookmark';
+		$f->value = $this->$f_name;
+		$inputfields->add($f);
+
+		if($modules->isInstalled('ProcessPageListerPro')) {
+
+			/* @var InputfieldFieldset $fieldset */
+			$fieldset = $this->wire('modules')->get('InputfieldFieldset');
+			$fieldset->label = $this->_('How should the VIEW and EDIT links work?');
+			$fieldset->description = $this->_('View or edit links only appear on a page when the user has access to view or edit access to it.');
+			$fieldset->icon = 'random';
+			$inputfields->add($fieldset);
+
+			$modeOptions = [
+				ProcessPageLister::windowModeNone => $this->_('Same window'),
+				ProcessPageLister::windowModeModal => $this->_('Modal window'),
+				ProcessPageLister::windowModeBlank => $this->_('New window'),
+			];
+
+			/* @var InputfieldRadios $f */
+			$f = $this->modules->get('InputfieldRadios');
+			$f_name = 'view_mode';
+			$f->name = $f_name;
+			$f->label = $this->_('View links open in ...');
+			$f->addOptions($modeOptions);
+			$f->addOption(ProcessPageLister::windowModeHide, $this->_('Do not show view links'));
+			$f->value = $this->$f_name;
+			$f->columnWidth = 50;
+			$fieldset->add($f);
+
+			$f = $this->modules->get('InputfieldRadios');
+			$f_name = 'edit_mode';
+			$f->name = $f_name;
+			$f->label = $this->_('Edit links open in ...');
+			$f->addOptions($modeOptions);
+			$f->addOption(ProcessPageLister::windowModeHide, $this->_('Do not show edit links'));
+			$f->value = $this->$f_name;
+			$f->columnWidth = 50;
+			$fieldset->add($f);
+
+			/* @var InputfieldCheckboxes $f */
+			$f = $modules->get('InputfieldCheckboxes');
+			$f_name = 'enabled_actions';
+			$f->name = $f_name;
+			$f->label = $this->_('Enabled actions');
+			$f->icon = 'tasks';
+			$options = [];
+			foreach($this->wire('modules') as $module) {
+				$class_name = $module->className();
+				$parents = wireClassParents($class_name);
+				if(!in_array('PageAction', $parents)) continue;
+				$info = $this->wire('modules')->getModuleInfo($module);
+				$options[$module->className()] = $info['title'];
+
+			}
+			ksort($options);
+			$f->addOptions($options);
+			$f->value = $this->$f_name;
+			if(!$options) {
+				$f->collapsed = Inputfield::collapsedYes;
+				$f->notes = $this->_('No ListerPro action modules are installed.');
+			}
+			$inputfields->add($f);
+
+		}
+	}
+
+}

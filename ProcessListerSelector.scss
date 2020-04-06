@@ -1,0 +1,8 @@
+// No ListerPro config tab
+#_ProcessListerConfigTab { display:none; }
+// No filters form
+#ProcessListerFiltersForm { display:none !important; }
+// Header rows are not used for sorting
+.pw-table-sortable th:hover, table.ProcessListerTable thead th:hover { text-decoration:none; cursor:default; }
+// Config icon
+#ListerSelectorConfig { float:right; width:30px; height:30px; position:relative; text-align:center; margin-top:10px; z-index:5; }
