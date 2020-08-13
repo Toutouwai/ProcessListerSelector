@@ -1,7 +1,13 @@
 (function($) {
 
+	// Set Lister filters value
 	function setFilters() {
-		$('#ProcessListerFilters').val($('#ls_selector').val()).change();
+		var selector = $('#ls_selector').val().toLowerCase();
+		// Add default limit of 25 if none supplied in selector
+		if(selector.indexOf(' limit=') === -1 && selector.indexOf(',limit=') === -1 && selector.indexOf('limit=') !== 0) {
+			selector += ', limit=25';
+		}
+		$('#ProcessListerFilters').val(selector).change();
 	}
 
 	$(document).ready(function() {
@@ -20,9 +26,10 @@
 		// Table header rows are not used for sorting
 		ProcessLister.results.off('click', '.ProcessListerTable > thead th');
 
-		// Sync selector to filters
+		// Sync selector to filters when it changes
 		$('#ls_selector').change(setFilters);
 
+		// Set filters on DOM ready
 		setFilters();
 
 	});
