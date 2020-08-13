@@ -12,7 +12,8 @@
 		$selector_tab.find('a').click();
 
 		// Remove change event handler from filter input so it's possible to manually set it
-		$(document).off('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete)').on('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete):not([id=ProcessListerFilters])', function() {
+		$('#ProcessListerFilters').addClass('no-auto-change');
+		$(document).off('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete)').on('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete):not(.no-auto-change)', function() {
 			InputfieldSelector.changeAny($(this));
 		});
 

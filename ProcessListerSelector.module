@@ -17,6 +17,10 @@ class ProcessListerSelector extends Process implements ConfigurableModule {
 				'name' => 'lister-selector',
 				'title' => 'Lister Selector',
 			),
+			'permission' => 'lister-selector',
+			'permissions' => array(
+				'lister-selector' => 'Use the Lister Selector module'
+			),
 		);
 	}
 
@@ -95,11 +99,11 @@ class ProcessListerSelector extends Process implements ConfigurableModule {
 	public function ___execute() {
 		$out = '';
 
-		// Add config icon
-		if(!$this->wire('config')->ajax) {
+		// Add config icon: only for superuser
+		if($this->wire('user')->isSuperuser() && !$this->wire('config')->ajax) {
 			$config_tooltip = $this->_('Configure Lister Selector');
 			$admin_url = $this->wire('config')->urls->admin;
-			$out = "<a id='ListerSelectorConfig' href='{$admin_url}module/edit?name=ProcessListerSelector' target='_blank' uk-tooltip='title:$config_tooltip; pos:top-left' title='$config_tooltip'><i class='fa fa-fw fa-cog ui-priority-secondary'></i></a>";
+			$out = "<a id='ListerSelectorConfig' href='{$admin_url}module/edit?name=ProcessListerSelector' uk-tooltip='title:$config_tooltip; pos:top-left' title='$config_tooltip'><i class='fa fa-fw fa-cog ui-priority-secondary'></i></a>";
 		}
 
 		// Render Lister
@@ -143,22 +147,22 @@ class ProcessListerSelector extends Process implements ConfigurableModule {
 	/**
 	 * Encodes the given data with base64, and returns a URL-safe string
 	 *
-	 * @param string $data
+	 * @param string $str
 	 * @return string
 	 */
-	public function urlSafeBase64Encode($data) {
-		return strtr(base64_encode($data), ['+' => '-', '/' => '_', '=' => '']);
+	public function urlSafeBase64Encode($str) {
+		return strtr(base64_encode(urlencode($str)), ['+' => '-', '/' => '_', '=' => '']);
 	}
 
 	/**
-	 * Decodes URL-safe base64 encoded data
+	 * Decodes a URL-safe base64 encoded string
 	 *
-	 * @param string $data
+	 * @param string $str
 	 * @param bool $strict
 	 * @return string
 	 */
-	function urlSafeBase64Decode($data, $strict = false) {
-		return base64_decode(strtr($data, '-_', '+/'), $strict);
+	function urlSafeBase64Decode($str, $strict = false) {
+		return urldecode(base64_decode(strtr($str, '-_', '+/'), $strict));
 	}
 
 	/**
