@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-class ProcessListerSelector extends Process implements ConfigurableModule {
+class ProcessListerSelector extends Process implements Module, ConfigurableModule {
 
 	public static function getModuleinfo() {
 		return array(
