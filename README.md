@@ -12,7 +12,7 @@ A Process module that uses Lister/ListerPro, but with a selector string input in
 
 * If ListerPro is installed you can run ListerPro actions on the listed pages - the available actions are defined in the module config.
 
-* Bookmarks can be configured in the module config and accessed via the flyout menu for the module page.
+* Bookmarks can be configured in the module config and accessed via the flyout menu for the module page. For your convenience you can copy/paste a bookmark string from the note at the bottom of the Lister Selector results.
 
 ## Usage
 
