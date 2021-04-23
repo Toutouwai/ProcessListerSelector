@@ -28,12 +28,11 @@ A Process module that uses Lister/ListerPro, but with a selector string input in
 
 ### Process page
 
-![pls](https://user-images.githubusercontent.com/1538852/90083802-a5211480-dd67-11ea-9a5b-79b07543e8b9.png)
+![lister-selector](https://user-images.githubusercontent.com/1538852/115847323-f1842e80-a476-11eb-87d2-d4999fea5b41.png)
 
 ### Module config (when ListerPro is installed)
 
-![pls-config](https://user-images.githubusercontent.com/1538852/90083804-a6524180-dd67-11ea-83a5-affa1338344c.png)
-
+![lister-selector-config](https://user-images.githubusercontent.com/1538852/115847353-f9dc6980-a476-11eb-973d-ad285a35e9cc.png)
 
 ## Advanced
 
@@ -42,7 +41,10 @@ If for any reason you want to create dynamic bookmark links to Lister Selector f
 ```php
 /** @var $pls ProcessListerSelector */
 $pls = $modules->get('ProcessListerSelector');
+// Define selector
 $selector = "template=foo, title%=bar";
-$pls_link = $pls->getProcessPage()->url . '?bm=' . $pls->urlSafeBase64Encode($selector);
+// Define columns (optional)
+$columns = 'title,modified';
+$pls_link = $pls->getProcessPage()->url . '?bm=' . $pls->urlSafeBase64Encode($selector . ':' . $columns);
 echo "<a href='$pls_link'>My link</a>";
 ```

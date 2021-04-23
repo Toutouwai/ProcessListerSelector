@@ -6,7 +6,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		return array(
 			'title' => 'Lister Selector',
 			'summary' => 'Use a selector string to list items with Lister/ListerPro.',
-			'version' => '0.1.1',
+			'version' => '0.1.2',
 			'author' => 'Robin Sallis',
 			'href' => 'https://github.com/Toutouwai/ListerSelector',
 			'icon' => 'search-plus',
@@ -32,6 +32,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		$this->addHookBefore('InputfieldForm::render', $this, 'beforeFormRender');
 		$this->addHookAfter('ProcessPageLister::renderedExtras', $this, 'afterRenderedExtras');
 		$this->addHookAfter('ProcessPageLister::getSelector', $this, 'afterGetSelector');
+		$this->addHookAfter('ProcessPageLister::renderResults', $this, 'afterRenderResults');
 	}
 
 	/**
@@ -68,7 +69,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		$wrapper = new InputfieldWrapper();
 		$session_selector = $lister->sessionGet('selector');
 		/* @var InputfieldText $f */
-		$f = $this->wire('modules')->get('InputfieldText');
+		$f = $this->wire()->modules->get('InputfieldText');
 		$f->name = 'ls_selector';
 		$f->id = 'ls_selector';
 		$f->label = $this->_('Selector string');
@@ -92,29 +93,67 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 	}
 
 	/**
+	 * After ProcessPageLister::renderResults
+	 * Add bookmark string for easy copy/paste
+	 *
+	 * @param HookEvent $event
+	 */
+	protected function afterRenderResults(HookEvent $event) {
+		/* @var ProcessPageLister $lister */
+		$lister = $event->object;
+		$selector = $lister->sessionGet('selector');
+		// Remove the default limit because it's not needed for a bookmark
+		$selector = str_replace([', limit=25', 'limit=25, '], '', $selector);
+		$columns = $lister->columns;
+		$bookmark_label = $this->_('Bookmark string...');
+		$your_label = $this->_('Your label');
+		$bookmark = "{$bookmark_label}<br>{$your_label}:{$selector}";
+		if($columns) {
+			$columns_string = implode(',', $columns);
+			$bookmark .= ":{$columns_string}";
+		}
+		$event->return .= "<p class='notes'>$bookmark</p>";
+	}
+
+	/**
 	 * Execute
 	 *
 	 * @return string
 	 */
 	public function ___execute() {
+		$config = $this->wire()->config;
 		$out = '';
 
 		// Add config icon: only for superuser
-		if($this->wire('user')->isSuperuser() && !$this->wire('config')->ajax) {
+		if($this->wire()->user->isSuperuser() && !$config->ajax) {
 			$config_tooltip = $this->_('Configure Lister Selector');
-			$admin_url = $this->wire('config')->urls->admin;
+			$admin_url = $config->urls->admin;
 			$out = "<a id='ListerSelectorConfig' href='{$admin_url}module/edit?name=ProcessListerSelector' uk-tooltip='title:$config_tooltip; pos:top-left' title='$config_tooltip'><i class='fa fa-fw fa-cog ui-priority-secondary'></i></a>";
 		}
 
 		// Render Lister
 		/* @var ProcessPageLister|ProcessPageListerPro $lister */
 		$lister = $this->getLister();
-		$bookmark = $this->wire('input')->get->text('bm');
-		if($bookmark) $lister->sessionSet('selector', $this->urlSafeBase64Decode($bookmark));
+		$bookmark = $this->wire()->input->get->text('bm');
+		if($bookmark) {
+			// Get pieces from decoded bookmark
+			$pieces = explode(':', $this->urlSafeBase64Decode($bookmark));
+			$pieces = array_filter(array_map('trim', $pieces));
+			// Assign to variables
+			list($selector, $columns_string) = array_pad($pieces, 2, null);
+			// Set selector
+			if($selector) $lister->sessionSet('selector', $selector);
+			// Set columns if any
+			if($columns_string) {
+				$columns = explode(',', $columns_string);
+				$columns = array_filter(array_map('trim', $columns));
+				if(count($columns)) $lister->columns = $columns;
+			}
+		}
+
 		$out .= $lister->execute();
 
 		// Add late JS
-		$config = $this->wire('config');
 		$info = $this->getModuleInfo();
 		$version = $info['version'];
 		$config->scripts->add($config->urls->{$this} . "{$this}Late.js?v={$version}");
@@ -128,16 +167,16 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 	 * @return ProcessPageLister|ProcessPageListerPro
 	 */
 	public function ___getLister() {
-		$modules = $this->wire('modules');
+		$modules = $this->wire()->modules;
 		if($modules->isInstalled('ProcessPageListerPro')) {
 			/* @var ProcessPageListerPro $lister */
-			$lister = $this->modules->get('ProcessPageListerPro');
+			$lister = $modules->get('ProcessPageListerPro');
 			$lister->allowActions = $this->enabled_actions ?: [];
 			$lister->viewMode = $this->view_mode;
 			$lister->editMode = $this->edit_mode;
 		} else {
 			/* @var ProcessPageLister $lister */
-			$lister = $this->modules->get('ProcessPageLister');
+			$lister = $modules->get('ProcessPageLister');
 		}
 		$lister->allowBookmarks = false;
 		$lister->defaultSelector = '';
@@ -198,14 +237,16 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 	 * @param InputfieldWrapper $inputfields
 	 */
 	public function getModuleConfigInputfields($inputfields) {
-		$modules = $this->wire('modules');
+		$modules = $this->wire()->modules;
 
 		/* @var InputfieldTextarea $f */
 		$f = $modules->get('InputfieldTextarea');
 		$f_name = 'bookmarks';
 		$f->name = $f_name;
 		$f->label = $this->_('Bookmarks');
-		$f->description = $this->_('Enter bookmarks in the format label:selector, one per line.');
+		$f->description = $this->_('Enter bookmarks in the format **label:selector:columns**, one per line. The columns part is optional. For your convenience you can copy/paste a bookmark string from the note at the bottom of the Lister Selector results.');
+		$f->description .= "\n" . $this->_('Example bookmark') . "...\n";
+		$f->description .= $this->_('Your label') . ':template=basic-page:title,parent,modified';
 		$f->icon = 'bookmark';
 		$f->value = $this->$f_name;
 		$inputfields->add($f);
@@ -213,7 +254,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		if($modules->isInstalled('ProcessPageListerPro')) {
 
 			/* @var InputfieldFieldset $fieldset */
-			$fieldset = $this->wire('modules')->get('InputfieldFieldset');
+			$fieldset = $modules->get('InputfieldFieldset');
 			$fieldset->label = $this->_('How should the VIEW and EDIT links work?');
 			$fieldset->description = $this->_('View or edit links only appear on a page when the user has access to view or edit access to it.');
 			$fieldset->icon = 'random';
@@ -226,7 +267,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 			];
 
 			/* @var InputfieldRadios $f */
-			$f = $this->modules->get('InputfieldRadios');
+			$f = $modules->get('InputfieldRadios');
 			$f_name = 'view_mode';
 			$f->name = $f_name;
 			$f->label = $this->_('View links open in ...');
@@ -236,7 +277,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 			$f->columnWidth = 50;
 			$fieldset->add($f);
 
-			$f = $this->modules->get('InputfieldRadios');
+			$f = $modules->get('InputfieldRadios');
 			$f_name = 'edit_mode';
 			$f->name = $f_name;
 			$f->label = $this->_('Edit links open in ...');
@@ -253,11 +294,11 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 			$f->label = $this->_('Enabled actions');
 			$f->icon = 'tasks';
 			$options = [];
-			foreach($this->wire('modules') as $module) {
+			foreach($modules as $module) {
 				$class_name = $module->className();
 				$parents = wireClassParents($class_name);
 				if(!in_array('PageAction', $parents)) continue;
-				$info = $this->wire('modules')->getModuleInfo($module);
+				$info = $modules->getModuleInfo($module);
 				$options[$module->className()] = $info['title'];
 
 			}
