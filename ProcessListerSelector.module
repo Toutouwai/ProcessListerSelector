@@ -6,7 +6,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		return array(
 			'title' => 'Lister Selector',
 			'summary' => 'Use a selector string to list items with Lister/ListerPro.',
-			'version' => '0.1.2',
+			'version' => '0.1.3',
 			'author' => 'Robin Sallis',
 			'href' => 'https://github.com/Toutouwai/ListerSelector',
 			'icon' => 'search-plus',
@@ -24,6 +24,8 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		);
 	}
 
+	protected $lister;
+
 	/**
 	 * Init
 	 */
@@ -33,10 +35,26 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		$this->addHookAfter('ProcessPageLister::renderedExtras', $this, 'afterRenderedExtras');
 		$this->addHookAfter('ProcessPageLister::getSelector', $this, 'afterGetSelector');
 		$this->addHookAfter('ProcessPageLister::renderResults', $this, 'afterRenderResults');
+
+		// Define lister
+		$modules = $this->wire()->modules;
+		if($modules->isInstalled('ProcessPageListerPro')) {
+			/* @var ProcessPageListerPro $lister */
+			$lister = $modules->get('ProcessPageListerPro');
+			$lister->allowActions = $this->enabled_actions ?: [];
+			$lister->viewMode = $this->view_mode;
+			$lister->editMode = $this->edit_mode;
+		} else {
+			/* @var ProcessPageLister $lister */
+			$lister = $modules->get('ProcessPageLister');
+		}
+		$lister->allowBookmarks = false;
+		$lister->defaultSelector = '';
+		$this->lister = $lister;
 	}
 
 	/**
-	 * Init
+	 * Construct
 	 */
 	public function __construct() {
 		parent::__construct();
@@ -133,7 +151,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 
 		// Render Lister
 		/* @var ProcessPageLister|ProcessPageListerPro $lister */
-		$lister = $this->getLister();
+		$lister = $this->lister;
 		$bookmark = $this->wire()->input->get->text('bm');
 		if($bookmark) {
 			// Get pieces from decoded bookmark
@@ -162,25 +180,18 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 	}
 
 	/**
-	 * Get Lister/ListerPro instance
-	 *
-	 * @return ProcessPageLister|ProcessPageListerPro
+	 * Equivalent of ProcessPageListerPro::executeViewport
 	 */
-	public function ___getLister() {
-		$modules = $this->wire()->modules;
-		if($modules->isInstalled('ProcessPageListerPro')) {
-			/* @var ProcessPageListerPro $lister */
-			$lister = $modules->get('ProcessPageListerPro');
-			$lister->allowActions = $this->enabled_actions ?: [];
-			$lister->viewMode = $this->view_mode;
-			$lister->editMode = $this->edit_mode;
-		} else {
-			/* @var ProcessPageLister $lister */
-			$lister = $modules->get('ProcessPageLister');
-		}
-		$lister->allowBookmarks = false;
-		$lister->defaultSelector = '';
-		return $lister;
+	public function executeViewport($exit = true) {
+		return $this->lister->executeViewport($exit);
+	}
+
+	/**
+	 * Equivalent of ProcessPageListerPro::executeActions
+	 */
+	public function ___executeActions() {
+		$actions = new ListerProActions($this->lister);
+		return $actions->execute();
 	}
 
 	/**
