@@ -6,7 +6,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		return array(
 			'title' => 'Lister Selector',
 			'summary' => 'Use a selector string to list items with Lister/ListerPro.',
-			'version' => '0.1.3',
+			'version' => '0.1.4',
 			'author' => 'Robin Sallis',
 			'href' => 'https://github.com/Toutouwai/ListerSelector',
 			'icon' => 'search-plus',
@@ -24,7 +24,7 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 		);
 	}
 
-	protected $lister;
+	public $lister;
 
 	/**
 	 * Init
@@ -107,7 +107,22 @@ class ProcessListerSelector extends Process implements Module, ConfigurableModul
 	protected function afterGetSelector(HookEvent $event) {
 		/* @var ProcessPageLister $lister */
 		$lister = $event->object;
-		$event->return = $lister->sessionGet('selector');
+		$limit = $event->arguments(0);
+		$selector_str = $lister->sessionGet('selector');
+		// Set limit when supplied as an argument
+		if($limit !== null) {
+			$selectors = new Selectors($selector_str);
+			$s_limit = $selectors->get("field=limit");
+			if($s_limit) {
+				$s_limit->value = $limit;
+			} else {
+				$s_limit = new SelectorEqual('limit', $limit);
+				$selectors->add($s_limit);
+			};
+			if($s_limit) $selectors->remove($s_limit);
+			$selector_str = (string) $selectors;
+		}
+		$event->return = $selector_str;
 	}
 
 	/**
