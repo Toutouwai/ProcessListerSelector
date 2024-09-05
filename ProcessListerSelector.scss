@@ -2,7 +2,11 @@
 #_ProcessListerConfigTab { display:none; }
 // No filters form
 #ProcessListerFiltersForm { display:none !important; }
+// Table uses full available width
+#ProcessListerTable {
+	.ProcessListerTable { width:100% !important; min-width:0 !important; max-width:none !important; }
+}
 // Header rows are not used for sorting
 .pw-table-sortable th:hover, table.ProcessListerTable thead th:hover { text-decoration:none; cursor:default; }
 // Config icon
-#ListerSelectorConfig { float:right; width:30px; height:30px; position:relative; text-align:center; margin-top:10px; z-index:5; }
+#ListerSelectorConfig { float:right; width:30px; height:30px; position:relative; text-align:center; margin-left:6px; margin-top:10px; z-index:5; }
