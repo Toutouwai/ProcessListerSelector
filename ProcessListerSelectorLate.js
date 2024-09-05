@@ -1,4 +1,4 @@
-(function($) {
+$(document).ready(function() {
 
 	// Set Lister filters value
 	function setFilters() {
@@ -10,28 +10,24 @@
 		$('#ProcessListerFilters').val(selector).change();
 	}
 
-	$(document).ready(function() {
+	// Move "Selector" tab and focus it
+	var $selector_tab = $('#_ListerSelectorTab').parent('li');
+	$selector_tab.parent().prepend($selector_tab);
+	$selector_tab.find('a').click();
 
-		// Move "Selector" tab and focus it
-		var $selector_tab = $('#_ListerSelectorTab').parent('li');
-		$selector_tab.parent().prepend($selector_tab);
-		$selector_tab.find('a').click();
-
-		// Remove change event handler from filter input so it's possible to manually set it
-		$('#ProcessListerFilters').addClass('no-auto-change');
-		$(document).off('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete)').on('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete):not(.no-auto-change)', function() {
-			InputfieldSelector.changeAny($(this));
-		});
-
-		// Table header rows are not used for sorting
-		ProcessLister.results.off('click', '.ProcessListerTable > thead th');
-
-		// Sync selector to filters when it changes
-		$('#ls_selector').change(setFilters);
-
-		// Set filters on DOM ready
-		setFilters();
-
+	// Remove change event handler from filter input so it's possible to manually set it
+	$('#ProcessListerFilters').addClass('no-auto-change');
+	$(document).off('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete)').on('change', '.InputfieldSelector :input:not(.select-field):not(.input-value-autocomplete):not(.no-auto-change)', function() {
+		InputfieldSelector.changeAny($(this));
 	});
 
-}(jQuery));
+	// Table header rows are not used for sorting
+	ProcessLister.results.off('click', '.ProcessListerTable > thead th');
+
+	// Sync selector to filters when it changes
+	$('#ls_selector').change(setFilters);
+
+	// Set filters on DOM ready
+	setFilters();
+
+});
